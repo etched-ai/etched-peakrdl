@@ -1,0 +1,15 @@
+cc_library(
+    name = "{{name}}",
+    srcs = ["{{srcs}}"],
+    hdrs = ["{{hdrs}}"],
+    visibility = ["//fw:__subpackages__"],
+    deps = [{% for dep in impl_deps %}
+        "{{dep}}",{% endfor %}
+        "//fw/testing:bit_field_test",
+        "//fw/testing:testing",
+        "//fw/soc/sohu:sohu_chip_csr",
+        "//fw/app/csr_access_test:csr_test_ignorer",
+    ],
+)
+
+

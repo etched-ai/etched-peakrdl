@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "peakrdl-cheader"
+dynamic = ["version"]
+requires-python = ">=3.6"
+dependencies = [
+    "systemrdl-compiler @ https://github.com/etched-ai/systemrdl-compiler/archive/1f68d1895543f86c82c2699dba2a80149250ca0d.zip",
+    "jinja2",
+    "pyyaml",
+    "treelib",
+]
+
+authors = [
+    {name="cyrus-etched"},
+]
+description = "Generate C Header files from a SystemRDL register model"
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = [
+    "SystemRDL", "PeakRDL", "CSR", "compiler", "tool", "registers", "generator",
+    "C", "header", "software",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+]
+
+[project.urls]
+Source = "https://github.com/SystemRDL/PeakRDL-cheader"
+Tracker = "https://github.com/SystemRDL/PeakRDL-cheader/issues"
+Changelog = "https://github.com/SystemRDL/PeakRDL-cheader/releases"
+Documentation = "https://peakrdl-cheader.readthedocs.io/"
+
+[tool.setuptools.dynamic]
+version = {attr = "peakrdl_cheader.__about__.__version__"}
+
+[project.entry-points."peakrdl.exporters"]
+c-header = "peakrdl_cheader.__peakrdl__:Exporter"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"peakrdl_cheader" = ["templates/*"]
