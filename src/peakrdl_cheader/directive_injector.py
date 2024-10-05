@@ -2,13 +2,19 @@ import yaml
 from typing import Dict, Union
 
 from .design_state import DesignState
-from systemrdl.node import Node, AddrmapNode
+from systemrdl.node import Node, AddrmapNode, RegNode, FieldNode
 
 
 class DirectiveInjector:
     def __init__(self, ds: DesignState) -> None:
         self.ds = ds
         self.path: str
+
+    def find_field_in_regnode(self, fieldstr: str, node: RegNode) -> FieldNode:
+        for field in node.fields():
+            if field.inst_name == fieldstr:
+                return field
+        raise NameError(f"Field could not be found: {fieldstr}")
 
     def run(self, path: str, top_node: AddrmapNode) -> AddrmapNode:
         try:
@@ -31,6 +37,14 @@ class DirectiveInjector:
             node.set_ignore(True)
         else:
             for k, v in directives.items():
+                if type(node) == RegNode:
+                    if type(k) != str:
+                        raise NameError(f"Regnode_insert_err: {k} not of type str")
+                    if v != None:
+                        raise NameError(f"field {k} cannot have children")
+                    field = self.find_field_in_regnode(k, node)
+                    field.set_ignore(True)
+
                 if k == "arrayignores":
                     for basestr in v:
                         if ":" in basestr:

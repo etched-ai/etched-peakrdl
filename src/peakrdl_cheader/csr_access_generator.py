@@ -71,9 +71,9 @@ class CsrAccessGenerator(RDLListener):
         # differs from base version
         # Note: Changed from using rebuild as flag for rebuild to !unique,
         # ensuring no repeats unless in array
-        if not node.unique:
+        if node.rebuild:
             root = node
-            while not root.unique:
+            while root.rebuild:
                 root = root.parent
             return (
                 self.get_node_prefix(root)
@@ -189,7 +189,7 @@ class CsrAccessGenerator(RDLListener):
                     continue
                 addrptr = ""
                 if type(child) is RegNode:
-                    addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name})"
+                    addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name}"
                 else:
                     addrptr = f"{addr_ptr}.{child.inst_name}"
                 if child.is_array:
@@ -199,13 +199,13 @@ class CsrAccessGenerator(RDLListener):
 
                         fp.write("  if (passed) {\n")
                         fp.write(
-                            f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}], test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
+                            f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
                         )
                         fp.write("  }\n")
                 else:
                     fp.write("  if (passed) {\n")
                     fp.write(
-                        f"    passed &= {self.get_reg_test_name(child)}({addrptr}, test_idx);\n"
+                        f"    passed &= {self.get_reg_test_name(child)}({addrptr}), test_idx);\n"
                     )
                     fp.write("  }\n")
         fp.write("  return passed;\n")
@@ -242,7 +242,7 @@ class CsrAccessGenerator(RDLListener):
                 continue
             addrptr = ""
             if type(child) is RegNode:
-                addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name})"
+                addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name}"
             else:
                 addrptr = f"{addr_ptr}.{child.inst_name}"
             if child.is_array:
@@ -252,13 +252,13 @@ class CsrAccessGenerator(RDLListener):
 
                     curr_fp.write("  if (passed) {\n")
                     curr_fp.write(
-                        f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}], test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
+                        f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
                     )
                     curr_fp.write("  }\n")
             else:
                 curr_fp.write("  if (passed) {\n")
                 curr_fp.write(
-                    f"    passed &= {self.get_reg_test_name(child)}({addrptr}, test_idx);\n"
+                    f"    passed &= {self.get_reg_test_name(child)}({addrptr}), test_idx);\n"
                 )
                 curr_fp.write("  }\n")
         curr_fp.write("  return passed;\n")
@@ -305,6 +305,13 @@ class CsrAccessGenerator(RDLListener):
 
         for field in node.fields():
             field_prefix = prefix + "__" + field.inst_name.upper()
+
+            if field.ignore:
+                curr_fp.write(
+                    f"  // {field_prefix} has been ignored via injected directives\n\n"
+                )
+                continue
+
             if not field.is_sw_writable:
                 curr_fp.write(f"  // {field_prefix} is software read-only\n\n")
                 continue
@@ -352,6 +359,9 @@ class CsrAccessGenerator(RDLListener):
                 continue
             if type(child) is RegfileNode:
                 childstk = list(child.children()) + childstk
+                header_fp.write(
+                    f"  bool {self.get_reg_test_name(child)}(volatile {self.get_struct_name(child)}&, uint64_t);\n"
+                )
                 continue
             if type(child) is RegNode:
                 header_fp.write(
