@@ -61,7 +61,7 @@ class CsrAccessGenerator(RDLListener):
         stk = []
         curr = node
         while type(curr) is not AddrmapNode:
-            stk.append(node.inst_name)
+            stk.append(curr.inst_name)
             curr = curr.parent
         return ("_".join(stk)).title().replace("_", "")
 
@@ -101,7 +101,7 @@ class CsrAccessGenerator(RDLListener):
         # Returns test name for a specific field, which varies based on
         # the width of the register
         if node.size == 32:  # 32 bytes = 256 bits
-            return "bit_field_write_read_test"
+            return "BitFieldWriteReadTest256"
         elif node.size == 4:  # 4 bytes = 32 bits
             return "bit_field_write_read_32bit_test"
         else:
@@ -114,6 +114,7 @@ class CsrAccessGenerator(RDLListener):
             return WalkerAction.SkipDescendants
         if node.is_array:
             self.array_nest_lvl += 1
+        self.test_idx = 1
         path = self.rootdir + self.get_file_prefix(node) + ".cc"
         self.generateHeader(node)  # Creates .h file for addrmapnode
         fp = open(path, "w")
@@ -171,7 +172,8 @@ class CsrAccessGenerator(RDLListener):
                                 continue
                             fp.write("  if (passed) {\n")
                             fp.write(
-                                f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
+                                # f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
+                                f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx);\n"
                             )
                             fp.write("  }\n")
                     else:
@@ -191,7 +193,7 @@ class CsrAccessGenerator(RDLListener):
                 if type(child) is RegNode:
                     addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name}"
                 else:
-                    addrptr = f"{addr_ptr}.{child.inst_name}"
+                    addrptr = f"({addr_ptr}.{child.inst_name}"
                 if child.is_array:
                     for i in range(child.array_dimensions[0]):
                         if i in child.ignore_idxes:
@@ -199,7 +201,8 @@ class CsrAccessGenerator(RDLListener):
 
                         fp.write("  if (passed) {\n")
                         fp.write(
-                            f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
+                            # f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
+                            f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx);\n"
                         )
                         fp.write("  }\n")
                 else:
@@ -252,7 +255,8 @@ class CsrAccessGenerator(RDLListener):
 
                     curr_fp.write("  if (passed) {\n")
                     curr_fp.write(
-                        f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
+                        # f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
+                        f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx);\n"
                     )
                     curr_fp.write("  }\n")
             else:
@@ -289,7 +293,7 @@ class CsrAccessGenerator(RDLListener):
         if needs_checks:
             curr_fp.write("  uint64_t curr_test_idx;\n")
             curr_fp.write(
-                "  CsrTestIgnorer* ignorer = CsrTestIgnorer::GetCsrTestIgnorer();\n"
+                "  fw::app::csr_access_test::CsrTestIgnorer* ignorer = fw::app::csr_access_test::CsrTestIgnorer::GetCsrTestIgnorer();\n"
             )
 
         casted_addr = addr
