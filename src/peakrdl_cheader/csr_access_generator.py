@@ -247,7 +247,7 @@ class CsrAccessGenerator(RDLListener):
             if type(child) is RegNode:
                 addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name}"
             else:
-                addrptr = f"{addr_ptr}.{child.inst_name}"
+                addrptr = f"({addr_ptr}.{child.inst_name}"
             if child.is_array:
                 for i in range(child.array_dimensions[0]):
                     if i in child.ignore_idxes:
