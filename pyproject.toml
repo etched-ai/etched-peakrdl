@@ -7,7 +7,7 @@ name = "peakrdl-cheader"
 dynamic = ["version"]
 requires-python = ">=3.6"
 dependencies = [
-    "systemrdl-compiler @ git+ssh://git@github.com/etched-ai/etched-systemrdl-compiler.git@788675301b9ccb125bf29c07640f223eeceb185d",
+    "systemrdl-compiler @ https://github.com/etched-ai/etched-systemrdl-compiler/archive/788675301b9ccb125bf29c07640f223eeceb185d.zip",
     "jinja2",
     "pyyaml",
     "treelib",
