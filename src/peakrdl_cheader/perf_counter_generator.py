@@ -222,6 +222,7 @@ class PerfCounterGenerator(RDLListener):
             curr_fp.write(", ")
             curr_fp.write("temp_val")
             curr_fp.write(");")  # loginfo
+            curr_fp.write("fw::utils::FlushLogging();")
             curr_fp.write("}\n")  # if
             self.stringstack.pop(-1)
 
