@@ -19,6 +19,7 @@ class CHeaderExporter:
         node: Union[RootNode, AddrmapNode],
         directives_path: str,
         out_dir: str,
+        clang_format_path: str = "",
     ) -> None:
         # If it is the root node, skip to top addrmap
         if isinstance(node, RootNode):
@@ -45,6 +46,17 @@ class CHeaderExporter:
 
         try:
             for file_path in files:
-                subprocess.run(["clang-format", "-i", file_path], check=True)
+                cmd = ["clang-format", "-i", file_path]
+                if clang_format_path:
+                    cmd = [
+                        "clang-format",
+                        "-i",
+                        f"-style=file:{clang_format_path}",
+                        file_path,
+                    ]
+                subprocess.run(
+                    cmd,
+                    check=True,
+                )
         except subprocess.CalledProcessError as e:
             print(f"Error: Command failed with exit code {e.returncode}")
