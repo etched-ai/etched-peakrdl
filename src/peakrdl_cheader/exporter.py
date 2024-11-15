@@ -1,6 +1,7 @@
 import os
 import subprocess
 import glob
+import pathlib
 from typing import Any, Union
 
 from systemrdl.node import RootNode, AddrmapNode
@@ -31,6 +32,7 @@ class CHeaderExporter:
 
         # Validate and collect info for export
         DesignScanner(ds).run()
+        print("Injecting directives...")
         DirectiveInjector(ds).run(directives_path, top_node)
         names = NodenameRetriever(ds).run(top_node)
         UniqueRebuildDirectiveInjector(ds).run(top_node, names)
@@ -39,8 +41,10 @@ class CHeaderExporter:
 
         # Write output
 
+        print("Generating files...")
         CsrAccessGenerator(ds).run(out_dir, top_node)
 
+        print("Clang-formatting files...")
         files = glob.glob(os.path.join(out_dir, "*.cc"))
         files += glob.glob(os.path.join(out_dir, "*.h"))
 

@@ -121,14 +121,16 @@ class CsrAccessGenerator(RDLListener):
 
         # Test if has AddrmapNodes
         addrmapnodes = dict()
+        hasRegOrRegFile = False
         for child in node.children():
             if child.ignore:
                 continue
             if type(child) is AddrmapNode:
                 addrmapnodes[self.get_prefix(child)] = child
-        hasImports = True if addrmapnodes else False
+            if (type(child) is RegNode) or (type(child) is RegfileNode):
+                hasRegOrRegFile = True
 
-        self.stack.append((fp, hasImports))
+        self.stack.append((fp, hasRegOrRegFile))
 
         self.writeBUILD(node)
 
@@ -137,7 +139,7 @@ class CsrAccessGenerator(RDLListener):
             f'#include "{self.get_file_prefix(child)}.h"'
             for child in addrmapnodes.values()
         ]
-        context = {"hasImports": hasImports, "deps": deplist}
+        context = {"hasRegOrRegFile": hasRegOrRegFile, "deps": deplist}
         template = self.ds.jj_env.get_template("rw_test_registers_header.c")
         template.stream(context).dump(fp)
         fp.write("\n")
@@ -151,44 +153,37 @@ class CsrAccessGenerator(RDLListener):
             self.array_nest_lvl -= 1
         self.traversed.add(self.get_prefix(node))
 
-        (fp, hasImports) = self.stack.pop()
+        (fp, hasRegOrRegFile) = self.stack.pop()
         addr_ptr = self.get_node_prefix(node) + "_addr"
         fp.write(
             f"bool RwTest(volatile {self.get_struct_name(node)} &{addr_ptr}, uint64_t test_idx) {{\n"
         )
         fp.write("  bool passed = true;\n")
-        # This RDL only imports other RDLs
-        if hasImports:
-            for child in node.children():
-                if child.ignore:
-                    continue
-                if type(child) is SignalNode:
-                    continue
-                if type(child) is AddrmapNode:
-                    structmember = kwf(child.inst_name)
-                    if child.is_array:
-                        for i in range(child.array_dimensions[0]):
-                            if i in child.ignore_idxes:
-                                continue
-                            fp.write("  if (passed) {\n")
-                            fp.write(
-                                # f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
-                                f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx);\n"
-                            )
-                            fp.write("  }\n")
-                    else:
+
+        for child in node.children():
+            if child.ignore:
+                continue
+            if type(child) is SignalNode:
+                continue
+            if type(child) is AddrmapNode:
+                structmember = kwf(child.inst_name)
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
                         fp.write("  if (passed) {\n")
                         fp.write(
-                            f"    {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}, test_idx);\n"
+                            # f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
+                            f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx);\n"
                         )
                         fp.write("  }\n")
-        # This RDL only contains register definitions
-        else:
-            for child in node.children():
-                if child.ignore:
-                    continue
-                if type(child) is SignalNode:
-                    continue
+                else:
+                    fp.write("  if (passed) {\n")
+                    fp.write(
+                        f"    {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}, test_idx);\n"
+                    )
+                    fp.write("  }\n")
+            if (type(child) is RegNode) or (type(child) is RegfileNode):
                 addrptr = ""
                 if type(child) is RegNode:
                     addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name}"
@@ -247,7 +242,7 @@ class CsrAccessGenerator(RDLListener):
             if type(child) is RegNode:
                 addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name}"
             else:
-                addrptr = f"{addr_ptr}.{child.inst_name}"
+                addrptr = f"({addr_ptr}.{child.inst_name}"
             if child.is_array:
                 for i in range(child.array_dimensions[0]):
                     if i in child.ignore_idxes:
