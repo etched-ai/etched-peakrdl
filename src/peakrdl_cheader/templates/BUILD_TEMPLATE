@@ -5,10 +5,11 @@ cc_library(
     visibility = ["//fw:__subpackages__"],
     deps = [{% for dep in impl_deps %}
         "{{dep}}",{% endfor %}
+        "//fw/app/csr_access_test:csr_test_ignorer",
+        "//fw/soc/sohu:sohu_chip_csr",
         "//fw/testing:bit_field_test",
         "//fw/testing:testing",
-        "//fw/soc/sohu:sohu_chip_csr",
-        "//fw/app/csr_access_test:csr_test_ignorer",
+        "//fw/utils:csr_descriptor_helper",
     ],
 )
 

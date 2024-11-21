@@ -4,4 +4,5 @@
 #include "fw/app/csr_access_test/csr_test_ignorer.h"
 {% if hasRegOrRegFile %}#include "fw/testing/bit_field_test.h"
 #include "fw/testing/testing.h"
+#include "fw/utils/csr_descriptor_helper.h"
 {% endif %}

@@ -103,7 +103,7 @@ class CsrAccessGenerator(RDLListener):
         if node.size == 32:  # 32 bytes = 256 bits
             return "BitFieldWriteReadTest256"
         elif node.size == 4:  # 4 bytes = 32 bits
-            return "bit_field_write_read_32bit_test"
+            return "BitFieldWriteReadtest32"
         else:
             raise ValueError(
                 f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
@@ -153,7 +153,7 @@ class CsrAccessGenerator(RDLListener):
             self.array_nest_lvl -= 1
         self.traversed.add(self.get_prefix(node))
 
-        (fp, hasRegOrRegFile) = self.stack.pop()
+        (fp, _) = self.stack.pop()
         addr_ptr = self.get_node_prefix(node) + "_addr"
         fp.write(
             f"bool RwTest(volatile {self.get_struct_name(node)} &{addr_ptr}, uint64_t test_idx) {{\n"
@@ -277,18 +277,43 @@ class CsrAccessGenerator(RDLListener):
         )
         curr_fp.write("  bool passed = true;\n\n")
 
-        needs_checks = False
+        mask_checks = []
+        needs_check = False
+        needs_readonly = False
+        needs_writeonly = False
+        needs_singlepulse = False
         for field in node.fields():
-            if (
-                field.is_sw_writable
-                and field.is_sw_readable
-                and (not field.get_property("singlepulse"))
-            ):
-                needs_checks = True
-        if needs_checks:
+            if field.ignore or (not field.is_sw_readable and not field.is_sw_writable):
+                continue
+            if field.is_sw_readable and not field.is_sw_writable:
+                needs_readonly = True
+            elif field.is_sw_writable and not field.is_sw_readable:
+                needs_writeonly = True
+            elif field.is_sw_writable and field.is_sw_readable:
+                if field.get_property("singlepulse"):
+                    needs_singlepulse = True
+                else:
+                    needs_check = True
+
+        if needs_check:
             curr_fp.write("  uint64_t curr_test_idx;\n")
             curr_fp.write(
                 "  fw::app::csr_access_test::CsrTestIgnorer* ignorer = fw::app::csr_access_test::CsrTestIgnorer::GetCsrTestIgnorer();\n"
+            )
+        if needs_readonly:
+            curr_fp.write("  fw::utils::Csr256BitValue read_only_mask{0,0};\n")
+            mask_checks.append(
+                f"fw::testing::ReadCsrMasked256({addr}, read_only_mask);\n"
+            )
+        if needs_writeonly:
+            curr_fp.write("  fw::utils::Csr256BitValue write_only_mask{0,0};\n")
+            mask_checks.append(
+                f"fw::testing::ReadCsrMasked256({addr}, write_only_mask);\n"
+            )
+        if needs_singlepulse:
+            curr_fp.write("  fw::utils::Csr256BitValue singlepulse_mask{0,0};\n")
+            mask_checks.append(
+                f"fw::testing::ReadCsrMasked256({addr}, singlepulse_mask);\n"
             )
 
         casted_addr = addr
@@ -311,16 +336,29 @@ class CsrAccessGenerator(RDLListener):
                 )
                 continue
 
+            if not field.is_sw_writable and not field.is_sw_readable:
+                print(f"Field is not sw writeable or sw readable: {field_prefix}")
+                continue
+
             if not field.is_sw_writable:
-                curr_fp.write(f"  // {field_prefix} is software read-only\n\n")
+                curr_fp.write(f"  // {field_prefix} is software read-only\n")
+                curr_fp.write(
+                    f"  fw::testing::AddBitsToMask256(&read_only_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
+                )
                 continue
 
             if not field.is_sw_readable:
-                curr_fp.write(f"  // {field_prefix} is software write-only\n\n")
+                curr_fp.write(f"  // {field_prefix} is software write-only\n")
+                curr_fp.write(
+                    f"  fw::testing::AddBitsToMask256(&write_only_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
+                )
                 continue
 
             if field.get_property("singlepulse"):
-                curr_fp.write(f"  // {field_prefix} is singlepulse\n\n")
+                curr_fp.write(f"  // {field_prefix} is singlepulse\n")
+                curr_fp.write(
+                    f"  fw::testing::AddBitsToMask256(&singlepulse_mask, {field_prefix}_bp, {field_prefix}_bw);\n\ns"
+                )
                 continue
 
             context = {
@@ -337,6 +375,8 @@ class CsrAccessGenerator(RDLListener):
             template = self.ds.jj_env.get_template("rw_readwrite_test.c")
             template.stream(context).dump(curr_fp)
             curr_fp.write("\n\n")
+        for mask_check in mask_checks:
+            curr_fp.write(mask_check)
         curr_fp.write("  return passed;\n")
         curr_fp.write("}\n\n")  # RwTest
         return WalkerAction.SkipDescendants
