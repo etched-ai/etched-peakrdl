@@ -308,12 +308,12 @@ class CsrAccessGenerator(RDLListener):
         if needs_writeonly:
             curr_fp.write("  fw::utils::Csr256BitValue write_only_mask{0,0};\n")
             mask_checks.append(
-                f"fw::testing::ReadCsrMasked256({addr}, write_only_mask);\n"
+                f"fw::testing::WriteCsrMasked256({addr}, write_only_mask);\n"
             )
         if needs_singlepulse:
             curr_fp.write("  fw::utils::Csr256BitValue singlepulse_mask{0,0};\n")
             mask_checks.append(
-                f"fw::testing::ReadCsrMasked256({addr}, singlepulse_mask);\n"
+                f"fw::testing::WriteReadCsrMasked256({addr}, singlepulse_mask);\n"
             )
 
         casted_addr = addr
