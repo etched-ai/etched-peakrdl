@@ -103,7 +103,7 @@ class CsrAccessGenerator(RDLListener):
         if node.size == 32:  # 32 bytes = 256 bits
             return "BitFieldWriteReadTest256"
         elif node.size == 4:  # 4 bytes = 32 bits
-            return "BitFieldWriteReadtest32"
+            return "BitFieldWriteReadTest32"
         else:
             raise ValueError(
                 f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
@@ -357,7 +357,7 @@ class CsrAccessGenerator(RDLListener):
             if field.get_property("singlepulse"):
                 curr_fp.write(f"  // {field_prefix} is singlepulse\n")
                 curr_fp.write(
-                    f"  fw::testing::AddBitsToMask256(&singlepulse_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
+                    f"  fw::testing::AddBitsToMask256(&singlepulse_mask, {field_prefix}_bp, {field_prefix}_bw);\n\ngit"
                 )
                 continue
 
