@@ -357,7 +357,7 @@ class CsrAccessGenerator(RDLListener):
             if field.get_property("singlepulse"):
                 curr_fp.write(f"  // {field_prefix} is singlepulse\n")
                 curr_fp.write(
-                    f"  fw::testing::AddBitsToMask256(&singlepulse_mask, {field_prefix}_bp, {field_prefix}_bw);\n\ngit"
+                    f"  fw::testing::AddBitsToMask256(&singlepulse_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
                 )
                 continue
 
