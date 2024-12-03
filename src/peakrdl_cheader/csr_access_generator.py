@@ -109,6 +109,36 @@ class CsrAccessGenerator(RDLListener):
                 f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
             )
 
+    def get_full_mask_init(self, node: RegNode, var_name: str) -> str:
+        if node.size == 32:  # 32 bytes = 256 bits
+            return f"  uint32_t {var_name};\n"
+        elif node.size == 4:  # 4 bytes = 32 bits
+            return f"  fw::utils::Csr256BitValue {var_name}{{0,0}};\n"
+        else:
+            raise ValueError(
+                f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
+            )
+
+    def get_function_bit_postfix(self, node: RegNode) -> str:
+        if node.size == 32:  # 32 bytes = 256 bits
+            return "256"
+        elif node.size == 4:  # 4 bytes = 32 bits
+            return "32"
+        else:
+            raise ValueError(
+                f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
+            )
+
+    def get_proper_size_from_128(self, node: RegNode, addr: str) -> str:
+        if node.size == 32:  # 32 bytes = 256 bits
+            return addr
+        elif node.size == 4:  # 4 bytes = 32 bits
+            return f"reinterpret_cast<uint32_t*>({addr})"
+        else:
+            raise ValueError(
+                f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
+            )
+
     def enter_Addrmap(self, node: AddrmapNode) -> Optional[WalkerAction]:
         if (self.get_prefix(node) in self.traversed) or node.ignore:
             return WalkerAction.SkipDescendants
@@ -301,19 +331,19 @@ class CsrAccessGenerator(RDLListener):
                 "  fw::app::csr_access_test::CsrTestIgnorer* ignorer = fw::app::csr_access_test::CsrTestIgnorer::GetCsrTestIgnorer();\n"
             )
         if needs_readonly:
-            curr_fp.write("  fw::utils::Csr256BitValue read_only_mask{0,0};\n")
+            curr_fp.write(self.get_full_mask_init(node, "read_only_mask"))
             mask_checks.append(
-                f"fw::testing::ReadCsrMasked256({addr}, read_only_mask);\n"
+                f"fw::testing::ReadCsrMasked{self.get_function_bit_postfix(node)}({self.get_proper_size_from_128}, read_only_mask);\n"
             )
         if needs_writeonly:
-            curr_fp.write("  fw::utils::Csr256BitValue write_only_mask{0,0};\n")
+            curr_fp.write(self.get_full_mask_init(node, "write_only_mask"))
             mask_checks.append(
-                f"fw::testing::WriteCsrMasked256({addr}, write_only_mask);\n"
+                f"fw::testing::WriteCsrMasked{self.get_function_bit_postfix(node)}({self.get_proper_size_from_128}, write_only_mask);\n"
             )
         if needs_singlepulse:
-            curr_fp.write("  fw::utils::Csr256BitValue singlepulse_mask{0,0};\n")
+            curr_fp.write(self.get_full_mask_init(node, "singlepulse_mask"))
             mask_checks.append(
-                f"fw::testing::WriteReadCsrMasked256({addr}, singlepulse_mask);\n"
+                f"fw::testing::WriteReadCsrMasked{self.get_function_bit_postfix(node)}({self.get_proper_size_from_128}, singlepulse_mask);\n"
             )
 
         casted_addr = addr
@@ -343,21 +373,21 @@ class CsrAccessGenerator(RDLListener):
             if not field.is_sw_writable:
                 curr_fp.write(f"  // {field_prefix} is software read-only\n")
                 curr_fp.write(
-                    f"  fw::testing::AddBitsToMask256(&read_only_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
+                    f"  fw::testing::AddBitsToMask{self.get_function_bit_postfix(node)}(&read_only_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
                 )
                 continue
 
             if not field.is_sw_readable:
                 curr_fp.write(f"  // {field_prefix} is software write-only\n")
                 curr_fp.write(
-                    f"  fw::testing::AddBitsToMask256(&write_only_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
+                    f"  fw::testing::AddBitsToMask{self.get_function_bit_postfix(node)}(&write_only_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
                 )
                 continue
 
             if field.get_property("singlepulse"):
                 curr_fp.write(f"  // {field_prefix} is singlepulse\n")
                 curr_fp.write(
-                    f"  fw::testing::AddBitsToMask256(&singlepulse_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
+                    f"  fw::testing::AddBitsToMask{self.get_function_bit_postfix(node)}(&singlepulse_mask, {field_prefix}_bp, {field_prefix}_bw);\n\n"
                 )
                 continue
 
