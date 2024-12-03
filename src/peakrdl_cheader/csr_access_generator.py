@@ -113,7 +113,7 @@ class CsrAccessGenerator(RDLListener):
         if node.size == 32:  # 32 bytes = 256 bits
             return f"  fw::utils::Csr256BitValue {var_name}{{0,0}};\n"
         elif node.size == 4:  # 4 bytes = 32 bits
-            return f"  uint32_t {var_name};\n"
+            return f"  uint32_t {var_name} = 0;\n"
         else:
             raise ValueError(
                 f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
