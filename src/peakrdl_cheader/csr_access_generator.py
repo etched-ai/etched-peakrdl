@@ -111,9 +111,9 @@ class CsrAccessGenerator(RDLListener):
 
     def get_full_mask_init(self, node: RegNode, var_name: str) -> str:
         if node.size == 32:  # 32 bytes = 256 bits
-            return f"  uint32_t {var_name};\n"
-        elif node.size == 4:  # 4 bytes = 32 bits
             return f"  fw::utils::Csr256BitValue {var_name}{{0,0}};\n"
+        elif node.size == 4:  # 4 bytes = 32 bits
+            return f"  uint32_t {var_name};\n"
         else:
             raise ValueError(
                 f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
@@ -333,17 +333,17 @@ class CsrAccessGenerator(RDLListener):
         if needs_readonly:
             curr_fp.write(self.get_full_mask_init(node, "read_only_mask"))
             mask_checks.append(
-                f"fw::testing::ReadCsrMasked{self.get_function_bit_postfix(node)}({self.get_proper_size_from_128}, read_only_mask);\n"
+                f"fw::testing::ReadCsrMasked{self.get_function_bit_postfix(node)}({self.get_proper_size_from_128(node, addr)}, read_only_mask);\n"
             )
         if needs_writeonly:
             curr_fp.write(self.get_full_mask_init(node, "write_only_mask"))
             mask_checks.append(
-                f"fw::testing::WriteCsrMasked{self.get_function_bit_postfix(node)}({self.get_proper_size_from_128}, write_only_mask);\n"
+                f"fw::testing::WriteCsrMasked{self.get_function_bit_postfix(node)}({self.get_proper_size_from_128(node, addr)}, write_only_mask);\n"
             )
         if needs_singlepulse:
             curr_fp.write(self.get_full_mask_init(node, "singlepulse_mask"))
             mask_checks.append(
-                f"fw::testing::WriteReadCsrMasked{self.get_function_bit_postfix(node)}({self.get_proper_size_from_128}, singlepulse_mask);\n"
+                f"fw::testing::WriteReadCsrMasked{self.get_function_bit_postfix(node)}({self.get_proper_size_from_128(node, addr)}, singlepulse_mask);\n"
             )
 
         casted_addr = addr
