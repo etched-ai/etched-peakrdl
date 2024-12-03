@@ -133,7 +133,7 @@ class CsrAccessGenerator(RDLListener):
         if node.size == 32:  # 32 bytes = 256 bits
             return addr
         elif node.size == 4:  # 4 bytes = 32 bits
-            return f"reinterpret_cast<uint32_t*>({addr})"
+            return f"reinterpret_cast<volatile uint32_t*>({addr})"
         else:
             raise ValueError(
                 f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
