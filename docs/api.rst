@@ -15,7 +15,7 @@ the C header using the Python API.
 .. code-block:: python
 
     from systemrdl import RDLCompiler
-    from peakrdl_cheader.exporter import CHeaderExporter
+    from etched_peakrdl_cheader.exporter import CHeaderExporter
 
     # compile the SystemRDL
     rdlc = RDLCompiler()
@@ -30,5 +30,5 @@ the C header using the Python API.
 Exporter Class
 --------------
 
-.. autoclass:: peakrdl_cheader.exporter.CHeaderExporter
+.. autoclass:: etched_peakrdl_cheader.exporter.CHeaderExporter
     :members:

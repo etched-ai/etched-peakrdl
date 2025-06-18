@@ -71,7 +71,7 @@ jobs:
       - name: Test
         run: |
           cd tests
-          pytest --cov=peakrdl_cheader
+          pytest --cov=etched_peakrdl_cheader
 
       - name: Coveralls
         env:
@@ -118,7 +118,7 @@ jobs:
 
       - name: Run Lint
         run: |
-          pylint --rcfile tests/pylint.rc peakrdl_cheader
+          pylint --rcfile tests/pylint.rc etched_peakrdl_cheader
 
 #-------------------------------------------------------------------------------
   mypy:
@@ -136,7 +136,7 @@ jobs:
 
       - name: Type Check
         run: |
-          mypy --config-file tests/mypy.ini src/peakrdl_cheader
+          mypy --config-file tests/mypy.ini src/etched_peakrdl_cheader
 
 #-------------------------------------------------------------------------------
   build:

@@ -20,13 +20,13 @@ pip install -U ../
 export SKIP_SYNTH_TESTS=1
 #export STUB_SIMULATOR=1
 export NO_XSIM=1
-pytest -n auto --cov=peakrdl_cheader
+pytest -n auto --cov=etched_peakrdl_cheader
 
 # Generate coverage report
 coverage html -i -d htmlcov
 
 # Run lint
-pylint --rcfile pylint.rc ../src/peakrdl_cheader
+pylint --rcfile pylint.rc ../src/etched_peakrdl_cheader
 
 # Run static type checking
-mypy ../src/peakrdl_cheader
+mypy ../src/etched_peakrdl_cheader

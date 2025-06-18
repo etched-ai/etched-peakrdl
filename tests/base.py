@@ -4,8 +4,8 @@ import subprocess
 from itertools import product
 
 from systemrdl import RDLCompiler
-from peakrdl_cheader.exporter import CHeaderExporter
-from peakrdl_cheader.c_standards import CStandard
+from etched_peakrdl_cheader.exporter import CHeaderExporter
+from etched_peakrdl_cheader.c_standards import CStandard
 
 
 def get_permutations(spec):
