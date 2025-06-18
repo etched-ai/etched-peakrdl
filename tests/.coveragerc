@@ -8,9 +8,9 @@ omit =
 
 [paths]
 source =
-    ../src/peakrdl_cheader/
-    */site-packages/*/peakrdl_cheader
-    */site-packages/peakrdl_cheader
+    ../src/etched_peakrdl_cheader/
+    */site-packages/*/etched_peakrdl_cheader
+    */site-packages/etched_peakrdl_cheader
 
 [report]
 exclude_lines =
