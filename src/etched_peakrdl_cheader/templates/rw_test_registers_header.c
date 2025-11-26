@@ -5,4 +5,7 @@
 {% if hasRegOrRegFile %}#include "fw/testing/bit_field_test.h"
 #include "fw/testing/testing.h"
 #include "fw/utils/csr_descriptor_helper.h"
+#ifdef ENABLE_WAFERSORT_GPIO
+#include "sival/wafersort/sival_helper.h"
+#endif
 {% endif %}
