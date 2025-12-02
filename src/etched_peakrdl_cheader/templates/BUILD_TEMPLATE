@@ -2,7 +2,8 @@ cc_library(
     name = "{{name}}",
     srcs = ["{{srcs}}"],
     hdrs = ["{{hdrs}}"],
-    visibility = ["//fw:__subpackages__"],
+    defines = ["ENABLE_LOGGING"],
+    visibility = ["//sival:__subpackages__"],
     deps = [{% for dep in impl_deps %}
         "{{dep}}",{% endfor %}
         "//fw/app/csr_access_test:csr_test_ignorer",
@@ -10,6 +11,7 @@ cc_library(
         "//fw/testing:bit_field_test",
         "//fw/testing:testing",
         "//fw/utils:csr_descriptor_helper",
+        "//sival/wafersort:sival_helper",
     ],
 )
 
