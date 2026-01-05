@@ -134,6 +134,7 @@ class CsrAccessGenerator(RDLListener):
         prefix = self.get_prefix(node).lower()
 
         # IP index mapping based on CSR block prefix
+        # Note: Prefix comes from register node, not addrmap node
         ip_index_map = {
             # Datalink blocks
             "dlc_csr": "kDl",
@@ -142,13 +143,20 @@ class CsrAccessGenerator(RDLListener):
             "dl_ctl_top": "kDlCtl",
             "datalink_pair_csr": "kDl",
             "nlu_csr": "kDl",
-            # Compute blocks
+            "nlu_rf": "kDl",
+            # Compute blocks - register prefixes
             "ipu_wrapper_csr": "kIpu",
+            "ipu_rf": "kIpu",
             "isc_csr": "kIsc",
+            "isc_mem_rf": "kIsc",
             "wcu_csr": "kWcu",
+            "wcu_rf": "kWcu",
+            "wcu_quad_wrapper_ctrl_csr": "kWcu",
             # SAU blocks
             "sau_ctrl_csr": "kSau",
+            "sau_rf": "kSau",
             "samu_csr": "kSamu",
+            "samu_rf": "kSamu",
             "samu_quad_wrapper_ctrl_csr": "kSamu",
             # Peripherals
             "gpio_addr_block": "kCsr",
