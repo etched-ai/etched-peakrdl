@@ -2,7 +2,10 @@ cc_library(
     name = "{{name}}",
     srcs = ["{{srcs}}"],
     hdrs = ["{{hdrs}}"],
-    defines = ["ENABLE_LOGGING"],
+    local_defines = [
+        "ENABLE_WAFERSORT_GPIO",
+        "ENABLE_LOGGING",
+    ],
     visibility = ["//sival:__subpackages__"],
     deps = [{% for dep in impl_deps %}
         "{{dep}}",{% endfor %}
@@ -11,8 +14,8 @@ cc_library(
         "//fw/testing:bit_field_test",
         "//fw/testing:testing",
         "//fw/utils:csr_descriptor_helper",
-        "//sival/wafersort:sival_helper",
+        "//fw/utils:log",
+        "//sival/wafersort/csr:csr_test_utils",
     ],
 )
-
 
