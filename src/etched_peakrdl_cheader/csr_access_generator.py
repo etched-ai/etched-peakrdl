@@ -267,12 +267,12 @@ class CsrAccessGenerator(RDLListener):
                             continue
 
                         fp.write(
-                            f"  result = {self.get_reg_test_name(child)}({addrptr}[{i}]));\n"
+                            f"  result = {self.get_reg_test_name(child)}({addrptr}[{i}]), 0x0);\n"
                         )
                         fp.write("  if (!result.passed) return result;\n")
                 else:
                     fp.write(
-                        f"  result = {self.get_reg_test_name(child)}({addrptr}));\n"
+                        f"  result = {self.get_reg_test_name(child)}({addrptr}), 0x0);\n"
                     )
                     fp.write("  if (!result.passed) return result;\n")
         fp.write("  return sival::wafersort::TestResult::Pass();\n")
@@ -318,12 +318,12 @@ class CsrAccessGenerator(RDLListener):
                         continue
 
                     curr_fp.write(
-                        f"  result = {self.get_reg_test_name(child)}({addrptr}[{i}]));\n"
+                        f"  result = {self.get_reg_test_name(child)}({addrptr}[{i}]), 0x0);\n"
                     )
                     curr_fp.write("  if (!result.passed) return result;\n")
             else:
                 curr_fp.write(
-                    f"  result = {self.get_reg_test_name(child)}({addrptr}));\n"
+                    f"  result = {self.get_reg_test_name(child)}({addrptr}), 0x0);\n"
                 )
                 curr_fp.write("  if (!result.passed) return result;\n")
         curr_fp.write("  return sival::wafersort::TestResult::Pass();\n")
@@ -339,8 +339,10 @@ class CsrAccessGenerator(RDLListener):
 
         curr_fp.write(f"// {self.get_friendly_name(node)}\n")
         curr_fp.write(
-            f"sival::wafersort::TestResult {self.get_reg_test_name(node)}(volatile __uint128_t* {addr}) {{\n"
+            f"sival::wafersort::TestResult {self.get_reg_test_name(node)}(volatile __uint128_t* {addr}, uint64_t test_idx) {{\n"
         )
+        curr_fp.write("  auto ignorer = fw::app::csr_access_test::CsrTestIgnorer::GetCsrTestIgnorer();\n")
+        curr_fp.write("  uint64_t curr_test_idx = 0;\n")
 
         # First pass: determine what kind of tests are needed
         mask_checks = []
@@ -469,7 +471,7 @@ class CsrAccessGenerator(RDLListener):
                 continue
             if type(child) is RegNode:
                 header_fp.write(
-                    f"  sival::wafersort::TestResult {self.get_reg_test_name(child)}(volatile __uint128_t*);\n"
+                    f"  sival::wafersort::TestResult {self.get_reg_test_name(child)}(volatile __uint128_t*, uint64_t);\n"
                 )
         header_fp.write("}\n")
         header_fp.close()
