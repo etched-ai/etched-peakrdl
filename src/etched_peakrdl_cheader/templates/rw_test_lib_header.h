@@ -2,7 +2,8 @@
 
 #include <cstdint>
 #include "fw/soc/sohu/sohu_chip_csr.h"
+#include "sival/wafersort/sival_helper.h"
 
 namespace {{namespace}} {
-  bool RwTest(volatile {{struct_type_name}}&, uint64_t);
+  sival::wafersort::TestResult RwTest(volatile {{struct_type_name}}&);
 
