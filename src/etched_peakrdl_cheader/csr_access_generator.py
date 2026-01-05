@@ -129,6 +129,43 @@ class CsrAccessGenerator(RDLListener):
                 f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
             )
 
+    def get_ip_index(self, node: Node) -> str:
+        """Map CSR library prefix to IpIndex enum value for GPIO reporting."""
+        prefix = self.get_prefix(node).lower()
+
+        # IP index mapping based on CSR block prefix
+        ip_index_map = {
+            # Datalink blocks
+            "dlc_csr": "kDl",
+            "dl_dma_rf": "kDl",
+            "dl_bp_csr": "kDl",
+            "dl_ctl_top": "kDlCtl",
+            "datalink_pair_csr": "kDl",
+            "nlu_csr": "kDl",
+            # Compute blocks
+            "ipu_wrapper_csr": "kIpu",
+            "isc_csr": "kIsc",
+            "wcu_csr": "kWcu",
+            # SAU blocks
+            "sau_ctrl_csr": "kSau",
+            "samu_csr": "kSamu",
+            "samu_quad_wrapper_ctrl_csr": "kSamu",
+            # Peripherals
+            "gpio_addr_block": "kCsr",
+            "pcie_wrapper_csr": "kPcie",
+            "periph_ns_pad_csr": "kCsr",
+            # Ethernet (culpeo)
+            "culpeo": "kEth",
+        }
+
+        # Check for exact match first
+        for pattern, ip_index in ip_index_map.items():
+            if prefix.startswith(pattern):
+                return f"sival::wafersort::IpIndex::{ip_index}"
+
+        # Default to kCsr for unknown blocks
+        return "sival::wafersort::IpIndex::kCsr"
+
     def get_proper_size_from_128(self, node: RegNode, addr: str) -> str:
         if node.size == 32:  # 32 bytes = 256 bits
             return addr
@@ -398,6 +435,7 @@ class CsrAccessGenerator(RDLListener):
                 "field_bp": f"{field_prefix}_bp",
                 "field_bw": f"{field_prefix}_bw",
                 "test_idx": f"{hex(self.test_idx)}",
+                "ip_index": self.get_ip_index(node),
             }
             self.writeTestIdxMap(hex(self.test_idx), field)
 

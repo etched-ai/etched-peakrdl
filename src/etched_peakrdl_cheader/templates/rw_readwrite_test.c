@@ -9,14 +9,16 @@
         {{field_bp}},
         {{field_bw}},
         curr_test_idx,
-        nullptr);
+        nullptr,
+        {{ip_index}});
 #else
     passed = sival::wafersort::csr::BitFieldWriteReadTest256WithReport(
         {{reg_ptr}},
         {{field_bp}},
         {{field_bw}},
         curr_test_idx,
-        "{{field}}");
+        "{{field}}",
+        {{ip_index}});
 #endif
 {% else %}
 #ifndef ENABLE_LOGGING
@@ -25,14 +27,16 @@
         {{field_bp}},
         {{field_bw}},
         curr_test_idx,
-        nullptr);
+        nullptr,
+        {{ip_index}});
 #else
     passed = sival::wafersort::csr::BitFieldWriteReadTest32WithReport(
         {{reg_ptr}},
         {{field_bp}},
         {{field_bw}},
         curr_test_idx,
-        "{{field}}");
+        "{{field}}",
+        {{ip_index}});
 #endif
 {% endif %}
 #else
