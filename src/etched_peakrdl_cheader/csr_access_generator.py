@@ -341,8 +341,8 @@ class CsrAccessGenerator(RDLListener):
         curr_fp.write(
             f"sival::wafersort::TestResult {self.get_reg_test_name(node)}(volatile __uint128_t* {addr}) {{\n"
         )
-        curr_fp.write("  sival::wafersort::TestResult result = sival::wafersort::TestResult::Pass();\n\n")
 
+        # First pass: determine what kind of tests are needed
         mask_checks = []
         needs_check = False
         needs_readonly = False
@@ -361,8 +361,9 @@ class CsrAccessGenerator(RDLListener):
                 else:
                     needs_check = True
 
+        # Only declare result variable if there are testable R/W fields
         if needs_check:
-            pass  # No longer need curr_test_idx or ignorer - TestRunner handles progress
+            curr_fp.write("  sival::wafersort::TestResult result = sival::wafersort::TestResult::Pass();\n\n")
         if needs_readonly:
             curr_fp.write(self.get_full_mask_init(node, "read_only_mask"))
             mask_checks.append(
