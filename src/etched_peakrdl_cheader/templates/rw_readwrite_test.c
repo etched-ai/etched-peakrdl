@@ -35,7 +35,12 @@
 #endif
 {% endif %}
     if (!result.passed) {
-      return result;
+      // Report failure but continue running remaining fields.
+      result.reported = true;
+      sival::wafersort::TestCsrSramStatusGpio128(true, result.ip_index,
+                                                 result.address, result.data);
+      if (first_failure.passed) {
+        first_failure = result;
+      }
     }
   }
-
