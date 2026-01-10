@@ -230,6 +230,58 @@ class CsrAccessGenerator(RDLListener):
 
         (fp, _) = self.stack.pop()
         addr_ptr = self.get_node_prefix(node) + "_addr"
+
+        fp.write(
+            f"void RunAll(sival::wafersort::TestRunner& runner, volatile {self.get_struct_name(node)} &{addr_ptr}) {{\n"
+        )
+        for child in node.children():
+            if child.ignore:
+                continue
+            if type(child) is SignalNode:
+                continue
+            if type(child) is AddrmapNode:
+                structmember = kwf(child.inst_name)
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
+                        fp.write(
+                            f"  {self.get_namespace_name(child)}::RunAll(runner, {addr_ptr}.{structmember}[{i}]);\n"
+                        )
+                else:
+                    fp.write(
+                        f"  {self.get_namespace_name(child)}::RunAll(runner, {addr_ptr}.{structmember});\n"
+                    )
+            if type(child) is RegNode:
+                addrptr = (
+                    f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{kwf(child.inst_name)}"
+                )
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
+                        fp.write(
+                            f"  runner.Run([&]() {{ return {self.get_reg_test_name(child)}({addrptr}[{i}]), 0x0); }});\n"
+                        )
+                else:
+                    fp.write(
+                        f"  runner.Run([&]() {{ return {self.get_reg_test_name(child)}({addrptr}), 0x0); }});\n"
+                    )
+            if type(child) is RegfileNode:
+                structmember = kwf(child.inst_name)
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
+                        fp.write(
+                            f"  runner.Run([&]() {{ return {self.get_reg_test_name(child)}({addr_ptr}.{structmember}[{i}]); }});\n"
+                        )
+                else:
+                    fp.write(
+                        f"  runner.Run([&]() {{ return {self.get_reg_test_name(child)}({addr_ptr}.{structmember}); }});\n"
+                    )
+        fp.write("}\n\n")  # void RunAll
+
         fp.write(
             f"sival::wafersort::TestResult RwTest(volatile {self.get_struct_name(node)} &{addr_ptr}) {{\n"
         )
