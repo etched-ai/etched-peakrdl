@@ -12,6 +12,7 @@ from .directive_injector import DirectiveInjector
 from .nodename_retriever import NodenameRetriever
 from .unique_rebuild_directive_injector import UniqueRebuildDirectiveInjector
 from .csr_access_generator import CsrAccessGenerator
+from .csr_lib_splitter import split_default_wafersort_libs
 
 
 class CHeaderExporter:
@@ -43,6 +44,9 @@ class CHeaderExporter:
 
         print("Generating files...")
         CsrAccessGenerator(ds).run(out_dir, top_node)
+
+        print("Splitting large CSR test libraries...")
+        split_default_wafersort_libs(out_dir)
 
         print("Clang-formatting files...")
         files = glob.glob(os.path.join(out_dir, "*.cc"))

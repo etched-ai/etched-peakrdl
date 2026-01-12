@@ -129,6 +129,51 @@ class CsrAccessGenerator(RDLListener):
                 f"Unexpected regwidth of {node.size} for node {node.inst_name} | {self.get_struct_name(node)}"
             )
 
+    def get_ip_index(self, node: Node) -> str:
+        """Map CSR library prefix to IpIndex enum value for GPIO reporting."""
+        prefix = self.get_prefix(node).lower()
+
+        # IP index mapping based on CSR block prefix
+        # Note: Prefix comes from register node, not addrmap node
+        ip_index_map = {
+            # Datalink blocks
+            "dlc_csr": "kDl",
+            "dl_dma_rf": "kDl",
+            "dl_bp_csr": "kDl",
+            "dl_ctl_top": "kDlCtl",
+            "datalink_pair_csr": "kDl",
+            "nlu_csr": "kDl",
+            "nlu_rf": "kDl",
+            # Compute blocks - register prefixes
+            "ipu_wrapper_csr": "kIpu",
+            "ipu_rf": "kIpu",
+            "isc_csr": "kIsc",
+            "isc_mem_rf": "kIsc",
+            "wcu_csr": "kWcu",
+            "wcu_rf": "kWcu",
+            "wcu_quad_wrapper_ctrl_csr": "kWcu",
+            # SAU blocks
+            "sau_ctrl_csr": "kSau",
+            "sau_rf": "kSau",
+            "samu_csr": "kSamu",
+            "samu_rf": "kSamu",
+            "samu_quad_wrapper_ctrl_csr": "kSamu",
+            # Peripherals
+            "gpio_addr_block": "kCsr",
+            "pcie_wrapper_csr": "kPcie",
+            "periph_ns_pad_csr": "kCsr",
+            # Ethernet (culpeo)
+            "culpeo": "kEth",
+        }
+
+        # Check for exact match first
+        for pattern, ip_index in ip_index_map.items():
+            if prefix.startswith(pattern):
+                return f"sival::wafersort::IpIndex::{ip_index}"
+
+        # Default to kCsr for unknown blocks
+        return "sival::wafersort::IpIndex::kCsr"
+
     def get_proper_size_from_128(self, node: RegNode, addr: str) -> str:
         if node.size == 32:  # 32 bytes = 256 bits
             return addr
@@ -185,10 +230,65 @@ class CsrAccessGenerator(RDLListener):
 
         (fp, _) = self.stack.pop()
         addr_ptr = self.get_node_prefix(node) + "_addr"
+
         fp.write(
-            f"bool RwTest(volatile {self.get_struct_name(node)} &{addr_ptr}, uint64_t test_idx) {{\n"
+            f"void RunAll(sival::wafersort::TestRunner& runner, volatile {self.get_struct_name(node)} &{addr_ptr}) {{\n"
         )
-        fp.write("  bool passed = true;\n")
+        for child in node.children():
+            if child.ignore:
+                continue
+            if type(child) is SignalNode:
+                continue
+            if type(child) is AddrmapNode:
+                structmember = kwf(child.inst_name)
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
+                        fp.write(
+                            f"  {self.get_namespace_name(child)}::RunAll(runner, {addr_ptr}.{structmember}[{i}]);\n"
+                        )
+                else:
+                    fp.write(
+                        f"  {self.get_namespace_name(child)}::RunAll(runner, {addr_ptr}.{structmember});\n"
+                    )
+            if type(child) is RegNode:
+                addrptr = (
+                    f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{kwf(child.inst_name)}"
+                )
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
+                        fp.write(
+                            f"  runner.Run([&]() {{ return {self.get_reg_test_name(child)}({addrptr}[{i}]), 0x0); }});\n"
+                        )
+                else:
+                    fp.write(
+                        f"  runner.Run([&]() {{ return {self.get_reg_test_name(child)}({addrptr}), 0x0); }});\n"
+                    )
+            if type(child) is RegfileNode:
+                structmember = kwf(child.inst_name)
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
+                        fp.write(
+                            f"  runner.Run([&]() {{ return {self.get_reg_test_name(child)}({addr_ptr}.{structmember}[{i}]); }});\n"
+                        )
+                else:
+                    fp.write(
+                        f"  runner.Run([&]() {{ return {self.get_reg_test_name(child)}({addr_ptr}.{structmember}); }});\n"
+                    )
+        fp.write("}\n\n")  # void RunAll
+
+        fp.write(
+            f"sival::wafersort::TestResult RwTest(volatile {self.get_struct_name(node)} &{addr_ptr}) {{\n"
+        )
+        fp.write("  sival::wafersort::TestResult result = sival::wafersort::TestResult::Pass();\n")
+        fp.write(
+            "  sival::wafersort::TestResult first_failure = sival::wafersort::TestResult::Pass();\n"
+        )
 
         for child in node.children():
             if child.ignore:
@@ -201,43 +301,62 @@ class CsrAccessGenerator(RDLListener):
                     for i in range(child.array_dimensions[0]):
                         if i in child.ignore_idxes:
                             continue
-                        fp.write("  if (passed) {\n")
                         fp.write(
-                            # f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
-                            f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx);\n"
+                            f"  result = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}]);\n"
                         )
-                        fp.write("  }\n")
+                        fp.write(
+                            "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                        )
                 else:
-                    fp.write("  if (passed) {\n")
                     fp.write(
-                        f"    {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}, test_idx);\n"
+                        f"  result = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember});\n"
                     )
-                    fp.write("  }\n")
-            if (type(child) is RegNode) or (type(child) is RegfileNode):
-                addrptr = ""
-                if type(child) is RegNode:
-                    addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name}"
-                else:
-                    addrptr = f"({addr_ptr}.{child.inst_name}"
+                    fp.write(
+                        "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                    )
+            if type(child) is RegNode:
+                addrptr = (
+                    f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{kwf(child.inst_name)}"
+                )
                 if child.is_array:
                     for i in range(child.array_dimensions[0]):
                         if i in child.ignore_idxes:
                             continue
 
-                        fp.write("  if (passed) {\n")
                         fp.write(
-                            # f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
-                            f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx);\n"
+                            f"  result = {self.get_reg_test_name(child)}({addrptr}[{i}]), 0x0);\n"
                         )
-                        fp.write("  }\n")
+                        fp.write(
+                            "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                        )
                 else:
-                    fp.write("  if (passed) {\n")
                     fp.write(
-                        f"    passed &= {self.get_reg_test_name(child)}({addrptr}), test_idx);\n"
+                        f"  result = {self.get_reg_test_name(child)}({addrptr}), 0x0);\n"
                     )
-                    fp.write("  }\n")
-        fp.write("  return passed;\n")
-        fp.write("}\n")  # bool RwTest
+                    fp.write(
+                        "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                    )
+            if type(child) is RegfileNode:
+                structmember = kwf(child.inst_name)
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
+                        fp.write(
+                            f"  result = {self.get_reg_test_name(child)}({addr_ptr}.{structmember}[{i}]);\n"
+                        )
+                        fp.write(
+                            "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                        )
+                else:
+                    fp.write(
+                        f"  result = {self.get_reg_test_name(child)}({addr_ptr}.{structmember});\n"
+                    )
+                    fp.write(
+                        "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                    )
+        fp.write("  return first_failure;\n")
+        fp.write("}\n")  # TestResult RwTest
 
         fp.write(f"}} // end {self.get_namespace_name(node)} namespace\n")
         fp.close()
@@ -260,37 +379,59 @@ class CsrAccessGenerator(RDLListener):
         if node.is_array:
             self.array_nest_lvl -= 1
         curr_fp.write(
-            f"bool {self.get_reg_test_name(node)}(volatile {self.get_struct_name(node)} &{addr_ptr}, uint64_t test_idx) {{\n"
+            f"sival::wafersort::TestResult {self.get_reg_test_name(node)}(volatile {self.get_struct_name(node)} &{addr_ptr}) {{\n"
         )
-        curr_fp.write("  bool passed = true;\n")
+        curr_fp.write("  sival::wafersort::TestResult result = sival::wafersort::TestResult::Pass();\n")
+        curr_fp.write(
+            "  sival::wafersort::TestResult first_failure = sival::wafersort::TestResult::Pass();\n"
+        )
         for child in node.children():
             if child.ignore:
                 continue
             if type(child) is SignalNode:
                 continue
-            addrptr = ""
             if type(child) is RegNode:
-                addrptr = f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{child.inst_name}"
-            else:
-                addrptr = f"({addr_ptr}.{child.inst_name}"
-            if child.is_array:
-                for i in range(child.array_dimensions[0]):
-                    if i in child.ignore_idxes:
-                        continue
-
-                    curr_fp.write("  if (passed) {\n")
-                    curr_fp.write(
-                        # f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
-                        f"    passed &= {self.get_reg_test_name(child)}({addrptr}[{i}]), test_idx);\n"
-                    )
-                    curr_fp.write("  }\n")
-            else:
-                curr_fp.write("  if (passed) {\n")
-                curr_fp.write(
-                    f"    passed &= {self.get_reg_test_name(child)}({addrptr}), test_idx);\n"
+                addrptr = (
+                    f"reinterpret_cast<volatile __uint128_t*>(&{addr_ptr}.{kwf(child.inst_name)}"
                 )
-                curr_fp.write("  }\n")
-        curr_fp.write("  return passed;\n")
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
+
+                        curr_fp.write(
+                            f"  result = {self.get_reg_test_name(child)}({addrptr}[{i}]), 0x0);\n"
+                        )
+                        curr_fp.write(
+                            "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                        )
+                else:
+                    curr_fp.write(
+                        f"  result = {self.get_reg_test_name(child)}({addrptr}), 0x0);\n"
+                    )
+                    curr_fp.write(
+                        "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                    )
+            if type(child) is RegfileNode:
+                structmember = kwf(child.inst_name)
+                if child.is_array:
+                    for i in range(child.array_dimensions[0]):
+                        if i in child.ignore_idxes:
+                            continue
+                        curr_fp.write(
+                            f"  result = {self.get_reg_test_name(child)}({addr_ptr}.{structmember}[{i}]);\n"
+                        )
+                        curr_fp.write(
+                            "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                        )
+                else:
+                    curr_fp.write(
+                        f"  result = {self.get_reg_test_name(child)}({addr_ptr}.{structmember});\n"
+                    )
+                    curr_fp.write(
+                        "  if (!result.passed && first_failure.passed) first_failure = result;\n"
+                    )
+        curr_fp.write("  return first_failure;\n")
         curr_fp.write("}\n")
         return WalkerAction.Continue
 
@@ -303,10 +444,14 @@ class CsrAccessGenerator(RDLListener):
 
         curr_fp.write(f"// {self.get_friendly_name(node)}\n")
         curr_fp.write(
-            f"bool {self.get_reg_test_name(node)}(volatile __uint128_t* {addr}, uint64_t test_idx) {{\n"
+            f"sival::wafersort::TestResult {self.get_reg_test_name(node)}(volatile __uint128_t* {addr}, uint64_t test_idx) {{\n"
         )
-        curr_fp.write("  bool passed = true;\n\n")
+        curr_fp.write("  auto ignorer = fw::app::csr_access_test::CsrTestIgnorer::GetCsrTestIgnorer();\n")
+        curr_fp.write("  uint64_t curr_test_idx = 0;\n")
+        curr_fp.write("  (void)ignorer;\n")
+        curr_fp.write("  (void)curr_test_idx;\n")
 
+        # First pass: determine what kind of tests are needed
         mask_checks = []
         needs_check = False
         needs_readonly = False
@@ -325,10 +470,13 @@ class CsrAccessGenerator(RDLListener):
                 else:
                     needs_check = True
 
+        # Only declare result variable if there are testable R/W fields
         if needs_check:
-            curr_fp.write("  uint64_t curr_test_idx;\n")
             curr_fp.write(
-                "  fw::app::csr_access_test::CsrTestIgnorer* ignorer = fw::app::csr_access_test::CsrTestIgnorer::GetCsrTestIgnorer();\n"
+                "  sival::wafersort::TestResult result = sival::wafersort::TestResult::Pass();\n"
+            )
+            curr_fp.write(
+                "  sival::wafersort::TestResult first_failure = sival::wafersort::TestResult::Pass();\n\n"
             )
         if needs_readonly:
             curr_fp.write(self.get_full_mask_init(node, "read_only_mask"))
@@ -398,6 +546,7 @@ class CsrAccessGenerator(RDLListener):
                 "field_bp": f"{field_prefix}_bp",
                 "field_bw": f"{field_prefix}_bw",
                 "test_idx": f"{hex(self.test_idx)}",
+                "ip_index": self.get_ip_index(node),
             }
             self.writeTestIdxMap(hex(self.test_idx), field)
 
@@ -407,7 +556,10 @@ class CsrAccessGenerator(RDLListener):
             curr_fp.write("\n\n")
         for mask_check in mask_checks:
             curr_fp.write(mask_check)
-        curr_fp.write("  return passed;\n")
+        if needs_check:
+            curr_fp.write("  return first_failure;\n")
+        else:
+            curr_fp.write("  return sival::wafersort::TestResult::Pass();\n")
         curr_fp.write("}\n\n")  # RwTest
         return WalkerAction.SkipDescendants
 
@@ -429,12 +581,12 @@ class CsrAccessGenerator(RDLListener):
             if type(child) is RegfileNode:
                 childstk = list(child.children()) + childstk
                 header_fp.write(
-                    f"  bool {self.get_reg_test_name(child)}(volatile {self.get_struct_name(child)}&, uint64_t);\n"
+                    f"  sival::wafersort::TestResult {self.get_reg_test_name(child)}(volatile {self.get_struct_name(child)}&);\n"
                 )
                 continue
             if type(child) is RegNode:
                 header_fp.write(
-                    f"  bool {self.get_reg_test_name(child)}(volatile __uint128_t*, uint64_t);\n"
+                    f"  sival::wafersort::TestResult {self.get_reg_test_name(child)}(volatile __uint128_t*, uint64_t);\n"
                 )
         header_fp.write("}\n")
         header_fp.close()
