@@ -38,10 +38,16 @@ class CsrAccessGenerator(RDLListener):
 
     def run(self, rootdir: str, top_node: AddrmapNode) -> None:
         self.rootdir = rootdir
-        self.fbuild = open(rootdir + "BUILD", "w")
+        # os.path.join rather than string concatenation. `rootdir` arrives from
+        # peakrdl's -o argument, which does not guarantee a trailing separator, so
+        # `rootdir + "BUILD"` turned an output directory of "gen" into the file
+        # "genBUILD" beside it instead of "gen/BUILD".
+        self.fbuild = open(os.path.join(rootdir, "BUILD"), "w", encoding="utf-8")
         self.fbuild.write('load("@rules_cc//cc:defs.bzl", "cc_library")\n\n')
         self.f_test_idx_map = open(
-            rootdir + f".{top_node.inst_name}_text_idx_map.txt", "w"
+            os.path.join(rootdir, f".{top_node.inst_name}_text_idx_map.txt"),
+            "w",
+            encoding="utf-8",
         )
         self.root_node = top_node
         RDLWalker().walk(top_node, self)
@@ -145,9 +151,11 @@ class CsrAccessGenerator(RDLListener):
         if node.is_array:
             self.array_nest_lvl += 1
         self.test_idx = 1
-        path = self.rootdir + self.get_file_prefix(node) + ".cc"
+        # os.path.join for the same reason as in run(): self.rootdir may not end
+        # in a separator.
+        path = os.path.join(self.rootdir, self.get_file_prefix(node) + ".cc")
         self.generateHeader(node)  # Creates .h file for addrmapnode
-        fp = open(path, "w")
+        fp = open(path, "w", encoding="utf-8")
 
         # Test if has AddrmapNodes
         addrmapnodes = dict()
@@ -204,13 +212,20 @@ class CsrAccessGenerator(RDLListener):
                         fp.write("  if (passed) {\n")
                         fp.write(
                             # f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx | (uint64_t){hex(i)} << {(5 - (self.array_nest_lvl)) * 8});\n"
-                            f"    passed = {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx);\n"
+                            f"    passed &= {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}[{i}], test_idx);\n"
                         )
                         fp.write("  }\n")
                 else:
                     fp.write("  if (passed) {\n")
                     fp.write(
-                        f"    {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}, test_idx);\n"
+                        # The nested RwTest's return value must be folded into
+                        # `passed`. It was previously called as a bare statement
+                        # with the result discarded, so a child address map that
+                        # failed its read/write check left `passed` at true and
+                        # the generated test reported success -- a silent false
+                        # pass on real hardware. `&=` matches the register and
+                        # regfile branches below.
+                        f"    passed &= {self.get_namespace_name(child)}::RwTest({addr_ptr}.{structmember}, test_idx);\n"
                     )
                     fp.write("  }\n")
             if (type(child) is RegNode) or (type(child) is RegfileNode):
@@ -412,8 +427,10 @@ class CsrAccessGenerator(RDLListener):
         return WalkerAction.SkipDescendants
 
     def generateHeader(self, node: AddrmapNode) -> None:
-        header_path = self.rootdir + self.get_file_prefix(node) + ".h"
-        header_fp = open(header_path, "w")
+        # os.path.join for the same reason as in run(): self.rootdir may not end
+        # in a separator.
+        header_path = os.path.join(self.rootdir, self.get_file_prefix(node) + ".h")
+        header_fp = open(header_path, "w", encoding="utf-8")
 
         context = {
             "namespace": self.get_namespace_name(node),
