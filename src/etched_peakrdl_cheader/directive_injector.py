@@ -17,18 +17,39 @@ class DirectiveInjector:
         raise NameError(f"Field could not be found: {fieldstr}")
 
     def run(self, path: str, top_node: AddrmapNode) -> AddrmapNode:
-        try:
-            fp = open(path, "r")
-            directive_data = yaml.load_all(fp, Loader=yaml.FullLoader)
-            for dir_table in directive_data:
+        # Failures here must be fatal. The previous implementation wrapped the
+        # whole load-and-inject sequence in `except FileNotFoundError` plus a
+        # catch-all `except Exception`, printed the message, and returned
+        # normally. Because ignore_inject_recursive raises NameError for every
+        # directive that does not match the design (unknown node, unknown field,
+        # a field given children), a single typo in the YAML aborted injection
+        # part-way through and generation continued with the remaining
+        # directives silently unapplied -- emitting registers and fields that the
+        # directives file had explicitly marked as ignored, with nothing but one
+        # line of stdout to show for it. Propagating the exception makes peakrdl
+        # exit non-zero instead of shipping a wrong header.
+        #
+        # yaml.FullLoader is also replaced with yaml.SafeLoader. FullLoader still
+        # honours tags that construct arbitrary Python objects (it only blocks
+        # the subset that executes code directly), so it is not a safe parser for
+        # a file that may come from another team or a generated build artifact.
+        # These directives are plain nested mappings, lists, ints and strings --
+        # exactly what SafeLoader supports.
+        with open(path, "r", encoding="utf-8") as fp:
+            for dir_table in yaml.safe_load_all(fp):
+                if dir_table is None:
+                    # An empty YAML document ("---" with nothing after it) is
+                    # legal and carries no directives.
+                    continue
+                if not isinstance(dir_table, dict):
+                    raise TypeError(
+                        f"{path}: each directives document must be a mapping, "
+                        f"got {type(dir_table).__name__}"
+                    )
                 for k, v in dir_table.items():
                     print(f"Injecting directives: {k}")
                     self.ignore_inject_recursive(top_node, v)
-            fp.close()
-        except FileNotFoundError:
-            print(f"The file {path} was not found.")
-        except Exception as e:
-            print(f"An error occurred:\n{e}")
+        return top_node
 
     def ignore_inject_recursive(
         self, node: Node, directives: Union[Dict, None]
